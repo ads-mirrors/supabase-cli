@@ -125,7 +125,7 @@ func Run(ctx context.Context, starter StarterTemplate, fsys afero.Fs, options ..
 	}
 	// 7. [Optional] Deploy functions
 	if err := deploy.RunDefault(ctx, flags.ProjectRef, fsys); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, "Failed to deploy edge functions:", err)
 	}
 	utils.CmdSuggestion = suggestAppStart(utils.CurrentDirAbs, starter.Start)
 	return nil
