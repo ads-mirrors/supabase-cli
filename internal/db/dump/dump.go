@@ -42,8 +42,12 @@ func Run(ctx context.Context, path string, config pgconn.Config, schema, exclude
 	if dryRun {
 		fmt.Fprintln(os.Stderr, "DRY RUN: *only* printing the pg_dump script to console.")
 	}
-	db := "remote"
 	if utils.IsLocalDatabase(config) {
+		config.Host = utils.DbAliases[0]
+		config.Port = 5432
+	}
+	db := "remote"
+	if config.Host == utils.Config.Hostname {
 		db = "local"
 	}
 	if dataOnly {
@@ -166,6 +170,10 @@ func dump(ctx context.Context, config pgconn.Config, script string, env []string
 		fmt.Println(expanded)
 		return nil
 	}
+	hostConfig := container.HostConfig{}
+	if config.Host == utils.Config.Hostname {
+		hostConfig.NetworkMode = network.NetworkHost
+	}
 	return utils.DockerRunOnceWithConfig(
 		ctx,
 		container.Config{
@@ -173,9 +181,7 @@ func dump(ctx context.Context, config pgconn.Config, script string, env []string
 			Env:   allEnvs,
 			Cmd:   []string{"bash", "-c", script, "--"},
 		},
-		container.HostConfig{
-			NetworkMode: container.NetworkMode("host"),
-		},
+		hostConfig,
 		network.NetworkingConfig{},
 		"",
 		stdout,
