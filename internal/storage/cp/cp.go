@@ -13,6 +13,7 @@ import (
 	"github.com/go-errors/errors"
 	"github.com/spf13/afero"
 	"github.com/supabase/cli/internal/storage/client"
+	bucketInit "github.com/supabase/cli/internal/storage/init"
 	"github.com/supabase/cli/internal/storage/ls"
 	"github.com/supabase/cli/internal/utils"
 	"github.com/supabase/cli/internal/utils/flags"
@@ -137,10 +138,7 @@ func UploadStorageObjectAll(ctx context.Context, api storage.StorageAPI, remoteP
 			if err != nil && strings.Contains(err.Error(), `"error":"Bucket not found"`) {
 				// Retry after creating bucket
 				if bucket, prefix := client.SplitBucketPrefix(dstPath); len(prefix) > 0 {
-					body := storage.CreateBucketRequest{Name: bucket}
-					if config, ok := utils.Config.Storage.Buckets[bucket]; ok {
-						body.Public = config.Public
-					}
+					body := bucketInit.NewCreateBucketRequest(bucket)
 					if _, err := api.CreateBucket(ctx, body); err != nil {
 						return err
 					}

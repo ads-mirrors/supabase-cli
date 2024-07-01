@@ -25,10 +25,9 @@ import (
 	"github.com/supabase/cli/internal/functions/serve"
 	"github.com/supabase/cli/internal/services"
 	"github.com/supabase/cli/internal/status"
-	"github.com/supabase/cli/internal/storage/client"
+	bucketInit "github.com/supabase/cli/internal/storage/init"
 	"github.com/supabase/cli/internal/utils"
 	"github.com/supabase/cli/internal/utils/flags"
-	"github.com/supabase/cli/pkg/storage"
 )
 
 func suggestUpdateCmd(serviceImages map[string]string) string {
@@ -820,11 +819,6 @@ EOF
 		); err != nil {
 			return err
 		}
-		defer func() {
-			if err := createBuckets(ctx); err != nil {
-				fmt.Fprintln(os.Stderr, err)
-			}
-		}()
 		started = append(started, utils.StorageId)
 	}
 
@@ -1034,6 +1028,14 @@ EOF
 	}
 
 	p.Send(utils.StatusMsg("Waiting for health checks..."))
+	if utils.SliceContains(started, utils.StorageId) {
+		if err := start.WaitForHealthyService(ctx, serviceTimeout, utils.StorageId); err != nil {
+			return err
+		}
+		if err := bucketInit.Run(ctx, ""); err != nil {
+			return err
+		}
+	}
 	return start.WaitForHealthyService(ctx, serviceTimeout, started...)
 }
 
@@ -1063,21 +1065,4 @@ func formatMapForEnvConfig(input map[string]string, output *bytes.Buffer) {
 			output.WriteString(",")
 		}
 	}
-}
-
-func createBuckets(ctx context.Context) error {
-	api, err := client.NewStorageAPI(ctx, "")
-	if err != nil {
-		return err
-	}
-	for name, config := range utils.Config.Storage.Buckets {
-		body := storage.CreateBucketRequest{
-			Name:   name,
-			Public: config.Public,
-		}
-		if _, err := api.CreateBucket(ctx, body); err != nil {
-			return err
-		}
-	}
-	return nil
 }

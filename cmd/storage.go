@@ -5,9 +5,12 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/supabase/cli/internal/storage/client"
 	"github.com/supabase/cli/internal/storage/cp"
+	bucketInit "github.com/supabase/cli/internal/storage/init"
 	"github.com/supabase/cli/internal/storage/ls"
 	"github.com/supabase/cli/internal/storage/mv"
 	"github.com/supabase/cli/internal/storage/rm"
+	"github.com/supabase/cli/internal/utils"
+	"github.com/supabase/cli/internal/utils/flags"
 	"github.com/supabase/cli/pkg/storage"
 )
 
@@ -16,6 +19,15 @@ var (
 		GroupID: groupManagementAPI,
 		Use:     "storage",
 		Short:   "Manage Supabase Storage objects",
+	}
+
+	bucketInitCmd = &cobra.Command{
+		Use:   "init",
+		Short: "Create buckets declared in " + utils.ConfigPath,
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return bucketInit.Run(cmd.Context(), flags.ProjectRef)
+		},
 	}
 
 	recursive bool
@@ -79,9 +91,11 @@ rm ss:///bucket/docs/example.md ss:///bucket/readme.md
 
 func init() {
 	storageFlags := storageCmd.PersistentFlags()
+	storageFlags.StringVar(&flags.ProjectRef, "project-ref", "", "Project ref of the Supabase project.")
 	storageFlags.Bool("linked", true, "Connects to Storage API of the linked project.")
 	storageFlags.Bool("local", false, "Connects to Storage API of the local database.")
-	storageCmd.MarkFlagsMutuallyExclusive("linked", "local")
+	storageCmd.MarkFlagsMutuallyExclusive("linked", "local", "project-ref")
+	storageCmd.AddCommand(bucketInitCmd)
 	lsCmd.Flags().BoolVarP(&recursive, "recursive", "r", false, "Recursively list a directory.")
 	storageCmd.AddCommand(lsCmd)
 	cpFlags := cpCmd.Flags()
