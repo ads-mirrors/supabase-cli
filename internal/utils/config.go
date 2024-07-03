@@ -362,9 +362,10 @@ type (
 		Enabled      bool   `toml:"enabled"`
 		Image        string `toml:"-"`
 		Port         uint16 `toml:"port"`
-		ApiUrl       string `toml:"api_url"`
 		OpenaiApiKey string `toml:"openai_api_key"`
 		PgmetaImage  string `toml:"-"`
+		// Deprecated by GetApiUrl method
+		ApiUrl string `toml:"api_url"`
 	}
 
 	inbucket struct {

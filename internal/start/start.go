@@ -913,7 +913,7 @@ EOF
 					"STUDIO_PG_META_URL=http://" + utils.PgmetaId + ":8080",
 					"POSTGRES_PASSWORD=" + dbConfig.Password,
 					"SUPABASE_URL=http://" + utils.KongId + ":8000",
-					fmt.Sprintf("SUPABASE_PUBLIC_URL=%s:%v/", utils.Config.Studio.ApiUrl, utils.Config.Api.Port),
+					"SUPABASE_PUBLIC_URL=" + utils.GetApiUrl(""),
 					"AUTH_JWT_SECRET=" + utils.Config.Auth.JwtSecret,
 					"SUPABASE_ANON_KEY=" + utils.Config.Auth.AnonKey,
 					"SUPABASE_SERVICE_KEY=" + utils.Config.Auth.ServiceRoleKey,
