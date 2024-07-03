@@ -2,6 +2,7 @@ package status
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net/http"
@@ -142,6 +143,13 @@ func checkHTTPHead(ctx context.Context, path string) error {
 		}
 		client := &http.Client{
 			Timeout: 10 * time.Second,
+		}
+		if tr, ok := http.DefaultTransport.(*http.Transport); ok {
+			copy := tr.Clone()
+			copy.TLSClientConfig = &tls.Config{
+				InsecureSkipVerify: true, //nolint:gosec
+			}
+			client.Transport = copy
 		}
 		healthClient = fetcher.NewFetcher(
 			server,
