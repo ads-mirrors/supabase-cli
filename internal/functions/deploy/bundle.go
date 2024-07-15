@@ -16,21 +16,25 @@ import (
 	"github.com/supabase/cli/pkg/function"
 )
 
-type DockerBundler struct {
-	Fsys afero.Fs
+type dockerBundler struct {
+	fsys afero.Fs
 }
 
-func (b *DockerBundler) Bundle(ctx context.Context, entrypoint string, importMap string, output io.Writer) error {
+func NewDockerBundler(fsys afero.Fs) function.EszipBundler {
+	return &dockerBundler{fsys: fsys}
+}
+
+func (b *dockerBundler) Bundle(ctx context.Context, entrypoint string, importMap string, output io.Writer) error {
 	// Create temp directory to store generated eszip
 	slug := filepath.Base(filepath.Dir(entrypoint))
 	fmt.Fprintln(os.Stderr, "Bundling function:", utils.Bold(slug))
 	hostOutputDir := filepath.Join(utils.TempDir, fmt.Sprintf(".output_%s", slug))
 	// BitBucket pipelines require docker bind mounts to be world writable
-	if err := b.Fsys.MkdirAll(hostOutputDir, 0777); err != nil {
+	if err := b.fsys.MkdirAll(hostOutputDir, 0777); err != nil {
 		return errors.Errorf("failed to mkdir: %w", err)
 	}
 	defer func() {
-		if err := b.Fsys.RemoveAll(hostOutputDir); err != nil {
+		if err := b.fsys.RemoveAll(hostOutputDir); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 		}
 	}()
@@ -57,7 +61,7 @@ func (b *DockerBundler) Bundle(ctx context.Context, entrypoint string, importMap
 	}
 
 	if importMap != "" {
-		modules, dockerImportMapPath, err := utils.BindImportMap(importMap, b.Fsys)
+		modules, dockerImportMapPath, err := utils.BindImportMap(importMap, b.fsys)
 		if err != nil {
 			return err
 		}
@@ -83,7 +87,7 @@ func (b *DockerBundler) Bundle(ctx context.Context, entrypoint string, importMap
 		return err
 	}
 
-	eszipBytes, err := b.Fsys.Open(filepath.Join(hostOutputDir, "output.eszip"))
+	eszipBytes, err := b.fsys.Open(filepath.Join(hostOutputDir, "output.eszip"))
 	if err != nil {
 		return errors.Errorf("failed to open eszip: %w", err)
 	}

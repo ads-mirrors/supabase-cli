@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,25 +13,35 @@ import (
 	"github.com/go-errors/errors"
 )
 
-type NativeBundler struct {
-	BinPath string
+type nativeBundler struct {
+	binPath string
+	tempDir string
+	fsys    fs.FS
 }
 
-func (b *NativeBundler) Bundle(ctx context.Context, entrypoint string, importMap string, output io.Writer) error {
+func NewNativeBundler(tempDir string, fsys fs.FS) EszipBundler {
+	return &nativeBundler{
+		binPath: "edge-runtime",
+		tempDir: tempDir,
+		fsys:    fsys,
+	}
+}
+
+func (b *nativeBundler) Bundle(ctx context.Context, entrypoint string, importMap string, output io.Writer) error {
 	slug := filepath.Base(filepath.Dir(entrypoint))
-	outputPath := filepath.Join(os.TempDir(), slug+".eszip")
+	outputPath := filepath.Join(b.tempDir, slug+".eszip")
 	// TODO: make edge runtime write to stdout
 	args := []string{"bundle", "--entrypoint", entrypoint, "--output", outputPath}
 	if len(importMap) > 0 {
 		args = append(args, "--import-map", importMap)
 	}
-	cmd := exec.CommandContext(ctx, b.BinPath, args...)
+	cmd := exec.CommandContext(ctx, b.binPath, args...)
 	if err := cmd.Run(); err != nil {
 		return errors.Errorf("failed to bundle function: %w", err)
 	}
 	defer os.Remove(outputPath)
 	// Compress the output
-	eszipBytes, err := os.Open(outputPath)
+	eszipBytes, err := b.fsys.Open(outputPath)
 	if err != nil {
 		return errors.Errorf("failed to open eszip: %w", err)
 	}

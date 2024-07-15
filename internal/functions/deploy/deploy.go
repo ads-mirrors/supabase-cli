@@ -57,7 +57,7 @@ func Run(ctx context.Context, slugs []string, projectRef string, noVerifyJWT *bo
 		}
 		functionConfig[s] = function
 	}
-	api := function.NewEdgeRuntimeAPI(projectRef, *utils.GetSupabase(), &DockerBundler{Fsys: fsys})
+	api := function.NewEdgeRuntimeAPI(projectRef, *utils.GetSupabase(), NewDockerBundler(fsys))
 	if err := api.UpsertFunctions(ctx, functionConfig); err != nil {
 		return err
 	}
