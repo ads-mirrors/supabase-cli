@@ -258,9 +258,9 @@ type (
 		External               map[string]provider
 
 		// Custom secrets can be injected from .env file
-		JwtSecret      string `toml:"-" mapstructure:"jwt_secret"`
-		AnonKey        string `toml:"-" mapstructure:"anon_key"`
-		ServiceRoleKey string `toml:"-" mapstructure:"service_role_key"`
+		JwtSecret      *string `toml:"-" mapstructure:"jwt_secret"`
+		AnonKey        string  `toml:"-" mapstructure:"anon_key"`
+		ServiceRoleKey string  `toml:"-" mapstructure:"service_role_key"`
 
 		ThirdParty thirdParty `toml:"third_party"`
 	}
@@ -446,6 +446,7 @@ func WithHostname(hostname string) ConfigEditor {
 }
 
 func NewConfig(editors ...ConfigEditor) config {
+	defaultJwtSecret := defaultJwtSecret // Use the constant you defined earlier
 	initial := config{
 		Hostname: "127.0.0.1",
 		Api: api{
@@ -523,7 +524,7 @@ func NewConfig(editors ...ConfigEditor) config {
 				"workos":        {},
 				"zoom":          {},
 			},
-			JwtSecret: defaultJwtSecret,
+			JwtSecret: &defaultJwtSecret,
 		},
 		Inbucket: inbucket{
 			Image: inbucketImage,
@@ -600,13 +601,33 @@ func (c *config) Load(path string, fsys fs.FS) error {
 	if err := loadDefaultEnv(); err != nil {
 		return err
 	}
-	if err := viper.Unmarshal(c); err != nil {
+	viper.AutomaticEnv()
+	viper.SetEnvPrefix("SUPABASE")
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	fmt.Printf("SUPABASE_AUTH_JWT_SECRET environment variable: %s\n", os.Getenv("SUPABASE_AUTH_JWT_SECRET"))
+	fmt.Printf("Viper value for SUPABASE_AUTH_JWT_SECRET: %s\n", viper.GetString("AUTH_JWT_SECRET"))
+
+	fmt.Printf("Before Unmarshal - c.Auth.JwtSecret: %s\n", *c.Auth.JwtSecret)
+
+	// Custom unmarshaling
+	err := viper.Unmarshal(c)
+	if err != nil {
 		return errors.Errorf("failed to parse env to config: %w", err)
 	}
+
+	// Fallback to manual setting if unmarshaling didn't work
+	if c.Auth.JwtSecret == nil || *c.Auth.JwtSecret == "super-secret-jwt-token-with-at-least-32-characters-long" {
+		jwtSecret := viper.GetString("AUTH_JWT_SECRET")
+		if jwtSecret != "" {
+			c.Auth.JwtSecret = &jwtSecret
+		}
+	}
+
+	fmt.Printf("After Unmarshal - c.Auth.JwtSecret: %s\n", *c.Auth.JwtSecret)
 	// Generate JWT tokens
 	if len(c.Auth.AnonKey) == 0 {
 		anonToken := CustomClaims{Role: "anon"}.NewToken()
-		if signed, err := anonToken.SignedString([]byte(c.Auth.JwtSecret)); err != nil {
+		if signed, err := anonToken.SignedString([]byte(*c.Auth.JwtSecret)); err != nil {
 			return errors.Errorf("failed to generate anon key: %w", err)
 		} else {
 			c.Auth.AnonKey = signed
@@ -614,7 +635,7 @@ func (c *config) Load(path string, fsys fs.FS) error {
 	}
 	if len(c.Auth.ServiceRoleKey) == 0 {
 		anonToken := CustomClaims{Role: "service_role"}.NewToken()
-		if signed, err := anonToken.SignedString([]byte(c.Auth.JwtSecret)); err != nil {
+		if signed, err := anonToken.SignedString([]byte(*c.Auth.JwtSecret)); err != nil {
 			return errors.Errorf("failed to generate service_role key: %w", err)
 		} else {
 			c.Auth.ServiceRoleKey = signed
@@ -1215,7 +1236,7 @@ func (a *auth) ResolveJWKS(ctx context.Context) (string, error) {
 	}
 
 	secretJWK.KeyType = "oct"
-	secretJWK.KeyBase64URL = base64.RawURLEncoding.EncodeToString([]byte(a.JwtSecret))
+	secretJWK.KeyBase64URL = base64.RawURLEncoding.EncodeToString([]byte(*a.JwtSecret))
 
 	secretJWKEncoded, err := json.Marshal(&secretJWK)
 	if err != nil {
