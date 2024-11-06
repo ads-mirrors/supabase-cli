@@ -13,11 +13,9 @@ import (
 	"net/http"
 	"os"
 	"os/user"
-	"strconv"
 	"strings"
 	"time"
 
-	"github.com/cenkalti/backoff/v4"
 	"github.com/go-errors/errors"
 	"github.com/google/uuid"
 	"github.com/spf13/afero"
@@ -43,8 +41,6 @@ type AccessTokenResponse struct {
 	Nonce       string `json:"nonce"`
 }
 
-const defaultRetryAfterSeconds = 2
-const defaultMaxRetries = 90
 const decryptionErrorMsg = "cannot decrypt access token"
 
 var loggedInMsg = "You are now logged in. " + utils.Aqua("Happy coding!")
@@ -137,20 +133,11 @@ func pollForAccessToken(ctx context.Context, url string) (AccessTokenResponse, e
 		}),
 		fetcher.WithExpectedStatus(http.StatusOK),
 	)
-	timeout := backoff.NewConstantBackOff(defaultRetryAfterSeconds)
-	probe := func() (AccessTokenResponse, error) {
-		resp, err := client.Send(ctx, http.MethodGet, url, nil)
-		if err == nil {
-			return fetcher.ParseJSON[AccessTokenResponse](resp.Body)
-		} else if resp != nil {
-			if retryAfterSeconds, err := strconv.Atoi(resp.Header.Get("Retry-After")); err == nil {
-				timeout.Interval = time.Duration(retryAfterSeconds) * time.Second
-			}
-		}
+	resp, err := client.Send(ctx, http.MethodGet, url, nil)
+	if err != nil {
 		return AccessTokenResponse{}, err
 	}
-	policy := backoff.WithContext(backoff.WithMaxRetries(timeout, defaultMaxRetries), ctx)
-	return backoff.RetryWithData(probe, policy)
+	return fetcher.ParseJSON[AccessTokenResponse](resp.Body)
 }
 
 func Run(ctx context.Context, stdout io.Writer, params RunParams) error {
@@ -194,22 +181,22 @@ func Run(ctx context.Context, stdout io.Writer, params RunParams) error {
 		fmt.Fprintf(stdout, "Here is your login link, open it in the browser %s\n\n", utils.Bold(createLoginSessionUrl))
 	}
 
-	if err := utils.RunProgram(ctx, func(p utils.Program, ctx context.Context) error {
-		p.Send(utils.StatusMsg("Your token is now being generated and securely encrypted. Waiting for it to arrive..."))
+	// TODO: support automatic login flow
+	deviceCode, err := utils.NewConsole().PromptText(ctx, "Enter your verification code: ")
+	if err != nil {
+		return err
+	}
 
-		sessionPollingUrl := "/platform/cli/login/" + params.SessionId
-		accessTokenResponse, err := pollForAccessToken(ctx, sessionPollingUrl)
-		if err != nil {
-			return err
-		}
-
-		decryptedAccessToken, err := params.Encryption.decryptAccessToken(accessTokenResponse.AccessToken, accessTokenResponse.PublicKey, accessTokenResponse.Nonce)
-		if err != nil {
-			return err
-		}
-
-		return utils.SaveAccessToken(decryptedAccessToken, params.Fsys)
-	}); err != nil {
+	sessionPollingUrl := fmt.Sprintf("/platform/cli/login/%s?device_code=%s", params.SessionId, deviceCode)
+	accessTokenResponse, err := pollForAccessToken(ctx, sessionPollingUrl)
+	if err != nil {
+		return err
+	}
+	decryptedAccessToken, err := params.Encryption.decryptAccessToken(accessTokenResponse.AccessToken, accessTokenResponse.PublicKey, accessTokenResponse.Nonce)
+	if err != nil {
+		return err
+	}
+	if err := utils.SaveAccessToken(decryptedAccessToken, params.Fsys); err != nil {
 		return err
 	}
 
