@@ -2,8 +2,8 @@ package config
 
 import (
 	"encoding/base64"
-	"fmt"
 	"os"
+	"reflect"
 	"strings"
 
 	ecies "github.com/ecies/go/v2"
@@ -12,18 +12,18 @@ import (
 
 type Secret string
 
-func (s Secret) PlainText() *string {
-	key := os.Getenv("DOTENV_PRIVATE_KEY")
-	for _, k := range strings.Split(key, ",") {
-		value, err := decrypt(k, string(s))
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-		} else if len(value) > 0 {
-			return &value
-		}
+func (e *Secret) UnmarshalText(text []byte) error {
+	ciphertext, err := maybeLoadEnv(string(text))
+	if err != nil {
+		return err
 	}
-	// Empty strings are converted to nil
-	return nil
+	*e, err = EncryptedSecret(ciphertext)
+	return err
+}
+
+func (e Secret) MarshalText() (text []byte, err error) {
+	// TODO: return only hashed values?
+	return []byte(e), nil
 }
 
 const ENCRYPTED_PREFIX = "encrypted:"
@@ -54,4 +54,35 @@ func decrypt(key, value string) (string, error) {
 		return value, errors.Errorf("failed to decrypt secret: %w", err)
 	}
 	return string(plaintext), nil
+}
+
+func EncryptedSecret(ciphertext string) (Secret, error) {
+	var err error
+	var plaintext string
+	key := os.Getenv("DOTENV_PRIVATE_KEY")
+	for _, k := range strings.Split(key, ",") {
+		plaintext, err = decrypt(k, ciphertext)
+		if err == nil && len(plaintext) > 0 {
+			break
+		}
+	}
+	return Secret(plaintext), err
+}
+
+func DecryptSecretHook(f reflect.Type, t reflect.Type, data interface{}) (interface{}, error) {
+	if f.Kind() != reflect.String {
+		return data, nil
+	}
+	if t != reflect.TypeOf(Secret("")) {
+		return data, nil
+	}
+	return EncryptedSecret(data.(string))
+}
+
+func (s Secret) Hash(key string) Secret {
+	hash := hashPrefix
+	if len(s) > 0 {
+		hash += sha256Hmac(key, string(s))
+	}
+	return Secret(hash)
 }

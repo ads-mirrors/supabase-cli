@@ -396,7 +396,12 @@ func (c *config) loadFromEnv() error {
 	v.AutomaticEnv()
 	if err := v.MergeConfigMap(envKeysMap); err != nil {
 		return errors.Errorf("failed to merge config: %w", err)
-	} else if err := v.Unmarshal(c); err != nil {
+	} else if err := v.Unmarshal(c, viper.DecodeHook(mapstructure.ComposeDecodeHookFunc(
+		mapstructure.StringToTimeDurationHookFunc(),
+		mapstructure.StringToIPHookFunc(),
+		mapstructure.StringToSliceHookFunc(","),
+		DecryptSecretHook,
+	))); err != nil {
 		return errors.Errorf("failed to parse env to config: %w", err)
 	}
 	return nil
@@ -404,7 +409,7 @@ func (c *config) loadFromEnv() error {
 
 func (c *config) Load(path string, fsys fs.FS) error {
 	builder := NewPathBuilder(path)
-	// Load default values
+	// 1. Load default values
 	var buf bytes.Buffer
 	if err := initConfigTemplate.Option("missingkey=zero").Execute(&buf, c); err != nil {
 		return errors.Errorf("failed to initialise config template: %w", err)
@@ -413,6 +418,11 @@ func (c *config) Load(path string, fsys fs.FS) error {
 	if _, err := dec.Decode(c); err != nil {
 		return errors.Errorf("failed to decode config template: %w", err)
 	}
+	// 2. Load secrets from .env file
+	if err := loadDefaultEnv(); err != nil {
+		return err
+	}
+	// 3. Load custom config
 	if metadata, err := toml.DecodeFS(fsys, builder.ConfigPath, c); err != nil {
 		cwd, osErr := os.Getwd()
 		if osErr != nil {
@@ -426,13 +436,11 @@ func (c *config) Load(path string, fsys fs.FS) error {
 			}
 		}
 	}
-	// Load secrets from .env file
-	if err := loadDefaultEnv(); err != nil {
-		return err
-	} else if err := c.loadFromEnv(); err != nil {
+	// 4. Override mapstructure fields
+	if err := c.loadFromEnv(); err != nil {
 		return err
 	}
-	// Generate JWT tokens
+	// 5. Resolve derived fields
 	if len(c.Auth.AnonKey) == 0 {
 		anonToken := CustomClaims{Role: "anon"}.NewToken()
 		if signed, err := anonToken.SignedString([]byte(c.Auth.JwtSecret)); err != nil {
@@ -873,9 +881,6 @@ func (e *email) validate(fsys fs.FS) (err error) {
 		}
 		if len(e.Smtp.AdminEmail) == 0 {
 			return errors.New("Missing required field in config: auth.email.smtp.admin_email")
-		}
-		if e.Smtp.Pass, err = maybeLoadEnv(e.Smtp.Pass); err != nil {
-			return err
 		}
 	}
 	return nil
