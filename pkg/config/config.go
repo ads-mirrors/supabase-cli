@@ -16,6 +16,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"sort"
 	"strconv"
@@ -378,6 +379,36 @@ func (c *config) Eject(w io.Writer) error {
 	return nil
 }
 
+func (c *config) loadFromFile(filename string, fsys fs.FS) error {
+	f, err := fsys.Open(filename)
+	if err != nil {
+		return errors.Errorf("failed to read file: %w", err)
+	}
+	defer f.Close()
+	return c.loadFromReader(f)
+}
+
+func (c *config) loadFromReader(r io.Reader) error {
+	v := viper.New()
+	v.SetConfigType("toml")
+	if err := v.MergeConfig(r); err != nil {
+		return errors.Errorf("failed to merge config: %w", err)
+	}
+	if err := v.UnmarshalExact(c, viper.DecodeHook(mapstructure.ComposeDecodeHookFunc(
+		mapstructure.StringToTimeDurationHookFunc(),
+		mapstructure.StringToIPHookFunc(),
+		mapstructure.StringToSliceHookFunc(","),
+		mapstructure.TextUnmarshallerHookFunc(),
+		LoadEnvHook,
+	)), func(dc *mapstructure.DecoderConfig) {
+		dc.TagName = "toml"
+		dc.Squash = true
+	}); err != nil {
+		return errors.Errorf("failed to parse config: %w", err)
+	}
+	return nil
+}
+
 func (c *config) loadFromEnv() error {
 	// Allow overriding base config object with automatic env
 	// Ref: https://github.com/spf13/viper/issues/761
@@ -409,25 +440,13 @@ func (c *config) Load(path string, fsys fs.FS) error {
 	if err := initConfigTemplate.Option("missingkey=zero").Execute(&buf, c); err != nil {
 		return errors.Errorf("failed to initialise config template: %w", err)
 	}
-	dec := toml.NewDecoder(&buf)
-	if _, err := dec.Decode(c); err != nil {
-		return errors.Errorf("failed to decode config template: %w", err)
-	}
-	if metadata, err := toml.DecodeFS(fsys, builder.ConfigPath, c); err != nil {
-		cwd, osErr := os.Getwd()
-		if osErr != nil {
-			cwd = "current directory"
-		}
-		return errors.Errorf("cannot read config in %s: %w", cwd, err)
-	} else if undecoded := metadata.Undecoded(); len(undecoded) > 0 {
-		for _, key := range undecoded {
-			if key[0] != "remotes" {
-				fmt.Fprintf(os.Stderr, "Unknown config field: [%s]\n", key)
-			}
-		}
-	}
 	// Load secrets from .env file
 	if err := loadDefaultEnv(); err != nil {
+		return err
+	}
+	if err := c.loadFromReader(&buf); err != nil {
+		return err
+	} else if err := c.loadFromFile(builder.ConfigPath, fsys); err != nil {
 		return err
 	} else if err := c.loadFromEnv(); err != nil {
 		return err
@@ -761,6 +780,17 @@ func maybeLoadEnv(s string) (string, error) {
 	}
 
 	return "", errors.Errorf(`Error evaluating "%s": environment variable %s is unset.`, s, envName)
+}
+
+func LoadEnvHook(f reflect.Kind, t reflect.Kind, data interface{}) (interface{}, error) {
+	if f != reflect.String || t != reflect.String {
+		return data, nil
+	}
+	value := data.(string)
+	if matches := envPattern.FindStringSubmatch(value); len(matches) > 1 {
+		value = os.Getenv(matches[1])
+	}
+	return value, nil
 }
 
 func truncateText(text string, maxLen int) string {

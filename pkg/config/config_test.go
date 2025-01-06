@@ -388,6 +388,7 @@ func TestLoadFunctionImportMap(t *testing.T) {
 			"supabase/config.toml": &fs.MapFile{Data: []byte(`
 			project_id = "test"
 			[functions.hello]
+			enabled = true
 			`)},
 			"supabase/functions/hello/deno.json": &fs.MapFile{},
 			"supabase/functions/hello/index.ts":  &fs.MapFile{},
@@ -404,6 +405,7 @@ func TestLoadFunctionImportMap(t *testing.T) {
 			"supabase/config.toml": &fs.MapFile{Data: []byte(`
 			project_id = "test"
 			[functions.hello]
+			enabled = true
 			`)},
 			"supabase/functions/hello/deno.jsonc": &fs.MapFile{},
 			"supabase/functions/hello/index.ts":   &fs.MapFile{},
