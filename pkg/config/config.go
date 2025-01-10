@@ -409,7 +409,7 @@ func (c *config) loadFromReader(v *viper.Viper, r io.Reader) error {
 	// Find [remotes.*] block to override base config
 	baseId := v.GetString("project_id")
 	idToName := map[string]string{baseId: "base"}
-	for name, remote := range v.GetStringMap("remotes") {
+	for name := range v.GetStringMap("remotes") {
 		projectId := v.GetString(fmt.Sprintf("remotes.%s.project_id", name))
 		// Track remote project_id to check for duplication
 		if other, exists := idToName[projectId]; exists {
@@ -418,7 +418,8 @@ func (c *config) loadFromReader(v *viper.Viper, r io.Reader) error {
 		idToName[projectId] = fmt.Sprintf("[remotes.%s]", name)
 		if projectId == c.ProjectId {
 			fmt.Fprintln(os.Stderr, "Loading config override:", idToName[projectId])
-			if err := v.MergeConfigMap(remote.(map[string]any)); err != nil {
+			data := v.GetStringMap(fmt.Sprintf("remotes.%s", name))
+			if err := v.MergeConfigMap(data); err != nil {
 				return err
 			}
 			v.Set("project_id", baseId)
