@@ -103,7 +103,7 @@ func TestLinkCommand(t *testing.T) {
 			Reply(200).
 			BodyString("0.40.4")
 		// Run test
-		err := Run(context.Background(), project, fsys, conn.Intercept)
+		err := Run(context.Background(), project, pgconn.Config{}, fsys, conn.Intercept)
 		// Check error
 		assert.NoError(t, err)
 		assert.Empty(t, apitest.ListUnmatchedRequests())
@@ -167,7 +167,7 @@ func TestLinkCommand(t *testing.T) {
 			Get("/storage/v1/version").
 			ReplyError(errors.New("network error"))
 		// Run test
-		err := Run(context.Background(), project, fsys, func(cc *pgx.ConnConfig) {
+		err := Run(context.Background(), project, pgconn.Config{}, fsys, func(cc *pgx.ConnConfig) {
 			cc.LookupFunc = func(ctx context.Context, host string) (addrs []string, err error) {
 				return nil, errors.New("hostname resolving error")
 			}
@@ -224,7 +224,7 @@ func TestLinkCommand(t *testing.T) {
 			Get("/v1/projects").
 			ReplyError(errors.New("network error"))
 		// Run test
-		err := Run(context.Background(), project, fsys)
+		err := Run(context.Background(), project, pgconn.Config{}, fsys)
 		// Check error
 		assert.ErrorContains(t, err, "operation not permitted")
 		assert.Empty(t, apitest.ListUnmatchedRequests())

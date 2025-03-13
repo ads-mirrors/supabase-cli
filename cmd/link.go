@@ -29,11 +29,12 @@ var (
 			if err := flags.ParseProjectRef(ctx, afero.NewMemMapFs()); err != nil {
 				return err
 			}
+			config := flags.GetDbConfigOptionalPassword(flags.ProjectRef)
 			fsys := afero.NewOsFs()
 			if err := flags.LoadConfig(fsys); err != nil {
 				return err
 			}
-			return link.Run(ctx, flags.ProjectRef, fsys)
+			return link.Run(ctx, flags.ProjectRef, config, fsys)
 		},
 	}
 )

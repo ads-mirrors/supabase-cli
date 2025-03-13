@@ -24,7 +24,7 @@ import (
 	"github.com/supabase/cli/pkg/migration"
 )
 
-func Run(ctx context.Context, projectRef string, fsys afero.Fs, options ...func(*pgx.ConnConfig)) error {
+func Run(ctx context.Context, projectRef string, dbConfig pgconn.Config, fsys afero.Fs, options ...func(*pgx.ConnConfig)) error {
 	copy := utils.Config.Clone()
 	original, err := cliConfig.ToTomlBytes(copy)
 	if err != nil {
