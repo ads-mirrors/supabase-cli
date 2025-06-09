@@ -325,6 +325,12 @@ func WithHostname(hostname string) ConfigEditor {
 	}
 }
 
+func WithConfig(other config) ConfigEditor {
+	return func(c *config) {
+		(*c) = other
+	}
+}
+
 func NewConfig(editors ...ConfigEditor) config {
 	initial := config{baseConfig: baseConfig{
 		Hostname: "127.0.0.1",
