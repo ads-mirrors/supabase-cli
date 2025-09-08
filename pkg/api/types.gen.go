@@ -928,6 +928,7 @@ const (
 	UnindexedForeignKeys          V1ProjectAdvisorsResponseLintsName = "unindexed_foreign_keys"
 	UnsupportedRegTypes           V1ProjectAdvisorsResponseLintsName = "unsupported_reg_types"
 	UnusedIndex                   V1ProjectAdvisorsResponseLintsName = "unused_index"
+	VulnerablePostgresVersion     V1ProjectAdvisorsResponseLintsName = "vulnerable_postgres_version"
 )
 
 // Defines values for V1ProjectResponseStatus.
@@ -3393,10 +3394,52 @@ type VanitySubdomainConfigResponse struct {
 // VanitySubdomainConfigResponseStatus defines model for VanitySubdomainConfigResponse.Status.
 type VanitySubdomainConfigResponseStatus string
 
+// V1DeleteABranchParamsBranchIdOrRef0 defines parameters for V1DeleteABranch.
+type V1DeleteABranchParamsBranchIdOrRef0 = string
+
+// V1DeleteABranchParamsBranchIdOrRef1 defines parameters for V1DeleteABranch.
+type V1DeleteABranchParamsBranchIdOrRef1 = openapi_types.UUID
+
+// V1GetABranchConfigParamsBranchIdOrRef0 defines parameters for V1GetABranchConfig.
+type V1GetABranchConfigParamsBranchIdOrRef0 = string
+
+// V1GetABranchConfigParamsBranchIdOrRef1 defines parameters for V1GetABranchConfig.
+type V1GetABranchConfigParamsBranchIdOrRef1 = openapi_types.UUID
+
+// V1UpdateABranchConfigParamsBranchIdOrRef0 defines parameters for V1UpdateABranchConfig.
+type V1UpdateABranchConfigParamsBranchIdOrRef0 = string
+
+// V1UpdateABranchConfigParamsBranchIdOrRef1 defines parameters for V1UpdateABranchConfig.
+type V1UpdateABranchConfigParamsBranchIdOrRef1 = openapi_types.UUID
+
 // V1DiffABranchParams defines parameters for V1DiffABranch.
 type V1DiffABranchParams struct {
 	IncludedSchemas *string `form:"included_schemas,omitempty" json:"included_schemas,omitempty"`
 }
+
+// V1DiffABranchParamsBranchIdOrRef0 defines parameters for V1DiffABranch.
+type V1DiffABranchParamsBranchIdOrRef0 = string
+
+// V1DiffABranchParamsBranchIdOrRef1 defines parameters for V1DiffABranch.
+type V1DiffABranchParamsBranchIdOrRef1 = openapi_types.UUID
+
+// V1MergeABranchParamsBranchIdOrRef0 defines parameters for V1MergeABranch.
+type V1MergeABranchParamsBranchIdOrRef0 = string
+
+// V1MergeABranchParamsBranchIdOrRef1 defines parameters for V1MergeABranch.
+type V1MergeABranchParamsBranchIdOrRef1 = openapi_types.UUID
+
+// V1PushABranchParamsBranchIdOrRef0 defines parameters for V1PushABranch.
+type V1PushABranchParamsBranchIdOrRef0 = string
+
+// V1PushABranchParamsBranchIdOrRef1 defines parameters for V1PushABranch.
+type V1PushABranchParamsBranchIdOrRef1 = openapi_types.UUID
+
+// V1ResetABranchParamsBranchIdOrRef0 defines parameters for V1ResetABranch.
+type V1ResetABranchParamsBranchIdOrRef0 = string
+
+// V1ResetABranchParamsBranchIdOrRef1 defines parameters for V1ResetABranch.
+type V1ResetABranchParamsBranchIdOrRef1 = openapi_types.UUID
 
 // V1AuthorizeUserParams defines parameters for V1AuthorizeUser.
 type V1AuthorizeUserParams struct {
