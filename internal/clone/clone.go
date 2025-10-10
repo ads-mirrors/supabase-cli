@@ -9,14 +9,11 @@ import (
 	"github.com/cenkalti/backoff/v4"
 	"github.com/go-errors/errors"
 	"github.com/jackc/pgconn"
-	"github.com/jackc/pgx/v4"
 	"github.com/spf13/afero"
 	"github.com/spf13/viper"
 	"github.com/supabase/cli/internal/db/pull"
 	"github.com/supabase/cli/internal/link"
 	"github.com/supabase/cli/internal/login"
-	"github.com/supabase/cli/internal/migration/new"
-	"github.com/supabase/cli/internal/migration/repair"
 	"github.com/supabase/cli/internal/projects/apiKeys"
 	"github.com/supabase/cli/internal/utils"
 	"github.com/supabase/cli/internal/utils/flags"
@@ -98,26 +95,12 @@ func linkProject(ctx context.Context, fsys afero.Fs) error {
 	return utils.WriteFile(utils.ProjectRefPath, []byte(flags.ProjectRef), fsys)
 }
 
-func dumpRemoteSchema(ctx context.Context, config pgconn.Config, fsys afero.Fs, options ...func(*pgx.ConnConfig)) error {
-	// 1. Check postgres connection
-	conn, err := utils.ConnectByConfig(ctx, config, options...)
-	if err != nil {
+func dumpRemoteSchema(ctx context.Context, config pgconn.Config, fsys afero.Fs) error {
+	schemaPath := filepath.Join(utils.SchemasDir, "remote.sql")
+	utils.Config.Db.Migrations.SchemaPaths = append(utils.Config.Db.Migrations.SchemaPaths, filepath.ToSlash(schemaPath))
+	if err := pull.CloneRemoteSchema(ctx, schemaPath, config, fsys); err != nil {
 		return err
 	}
-	defer conn.Close(context.Background())
-	// 2. Pull schema
-	timestamp := utils.GetCurrentTimestamp()
-	path := new.GetMigrationPath(timestamp, "remote_schema")
-	// Ignore schemas flag when working on the initial pull
-	if err = pull.CloneRemoteSchema(ctx, path, config, fsys); err != nil {
-		return err
-	}
-	// 3. Insert a row to `schema_migrations`
-	fmt.Fprintln(os.Stderr, "Schema written to "+utils.Bold(path))
-	if shouldUpdate, err := utils.NewConsole().PromptYesNo(ctx, "Update remote migration history table?", true); err != nil {
-		return err
-	} else if shouldUpdate {
-		return repair.UpdateMigrationTable(ctx, conn, []string{timestamp}, repair.Applied, true, fsys)
-	}
+	fmt.Fprintln(os.Stderr, "Schema written to "+utils.Bold(schemaPath))
 	return nil
 }
